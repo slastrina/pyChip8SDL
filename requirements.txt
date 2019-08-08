@@ -1,2 +1,4 @@
 pytest
 pysdl2
+numpy
+hexdump
