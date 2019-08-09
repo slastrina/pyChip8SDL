@@ -17,6 +17,15 @@ class ram():
     def get_byte(self, idx):
         return self.ram[idx]
 
+    def get_interpreter_block(self):
+        return self.ram[self.RAM_START:self.PROG_STD_START]
+
+    def get_std_prog_block(self):
+        return self.ram[self.PROG_STD_START:self.RAM_END]
+
+    def get_eti_prog_block(self):
+        return self.ram[self.PROG_ETI_START:self.RAM_END]
+
     def clear(self):
         self.ram = bytearray(4096)
 
