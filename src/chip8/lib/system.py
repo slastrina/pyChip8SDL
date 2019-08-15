@@ -8,7 +8,8 @@ import os
 class System:
 
     flags = {
-        'draw': False
+        'draw': False,
+        'running': False
     }
 
     def __init__(self):
@@ -26,7 +27,6 @@ class System:
 
     def start(self):
         # Consider running in a dedicated thread
-        self.cpu.cycle()
-
-        #while(1):
-        #    pass
+        while 1:
+            self.cpu.tick()
+            break  # TODO remove break
