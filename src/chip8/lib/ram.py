@@ -20,7 +20,7 @@ class Ram:
     def __getitem__(self, idx):
         return self._ram[idx]
 
-    def get_ramge(self, start, end):
+    def get_range(self, start, end):
         return self._ram[start:end]
 
     def get_interpreter_block(self):
