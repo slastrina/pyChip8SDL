@@ -27,6 +27,8 @@ class System:
 
     def start(self):
         # Consider running in a dedicated thread
-        while 1:
+        self.cpu.running = True
+
+        while self.cpu.running:
             self.cpu.tick()
             break  # TODO remove break
