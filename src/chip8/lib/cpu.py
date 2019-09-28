@@ -23,6 +23,14 @@ class Cpu:
         self.display = display
         self.start_addr = start_addr
 
+        self.opcode = None
+        self.nxxx = None  # 0xF000
+        self.xnxx = None  # 0x0F00
+        self.xxnx = None  # 0x00F0
+        self.xxxn = None  # 0x000F
+        self.xxnn = None  # 0x00FF
+        self.xnnn = None  # 0x0FFF
+
         self.reset()
 
     def reset(self):
@@ -31,7 +39,7 @@ class Cpu:
 
         self.registers = {
             # 16 general purpose 8-bit registers, usually referred to as Vx, where x is a hexadecimal digit (0 - F)
-            'v': defaultdict(),
+            'v': defaultdict(lambda: 0),
 
             # 16-bit reg. This reg is used to store memory addresses so only the lowest (rightmost) 12 bits are used
             'i': 0,
@@ -51,12 +59,6 @@ class Cpu:
             'delay': [],
             'sound': []
         }
-
-        self.opcode = None
-        self.nxxx = None  #0xF000
-        self.xnnn = None  #0x0FFF
-        self.xnxx = None  #0x0F00
-        self.xxnx = None  #0x00F0
 
         self.key = bytearray(16)
 
@@ -92,7 +94,7 @@ class Cpu:
             raise Exception(f"Unknown Opcode {self.opcode}")
 
     def clear_screen(self):  # 0x00E0
-        print('clear the screen here')
+        self.display.reset()
 
     def return_from_subroutine(self):  # 0x00EE
         # self.registers['sp'] -= 1
@@ -168,7 +170,7 @@ class Cpu:
         }
 
         try:
-            ops[self.xxxn]()
+            ops[self.opcode & 0xF00F]()
         except Exception as ex:
             raise Exception(f"Unknown Opcode {self.opcode}")
 
