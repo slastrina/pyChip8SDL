@@ -218,7 +218,7 @@ class Cpu:
         y = self.xxnx >> 4
 
         if self.registers['v'][x] > self.registers['v'][y]:
-            self.registers['v'][x] = self.registers['v'][x] - self.registers['v'][y]
+            self.registers['v'][x] = self.registers['v'][x] - self.registe13rs['v'][y]
             self.registers['v'][0xF] = 1
         else:
             self.registers['v'][x] = 256 + self.registers['v'][x] - self.registers['v'][y]

@@ -5,6 +5,7 @@ import time
 import sdl2
 
 from chip8 import rom_path
+from chip8.lib.audio import Audio
 from chip8.lib.cpu import Cpu
 from chip8.lib.display import Display
 from chip8.lib.ram import Ram
@@ -31,6 +32,7 @@ class System:
     def __init__(self):
         self.ram = Ram()
         self.display = Display(64, 32, scale=12, title="pyChip8SDL")
+        self.audio = Audio()
         self.cpu = Cpu(self.ram.get_program_address(), self.ram, self.display)
 
     def reset(self):
@@ -120,6 +122,7 @@ class System:
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError(f"SDL_Init failed: {sdl2.SDL_GetError().decode()}")
         self.display.open()
+        self.audio.open()
 
         self.cpu.running = True
         next_frame = time.perf_counter()
@@ -137,6 +140,9 @@ class System:
                     self.cpu.timers['delay'] -= 1
                 if self.cpu.timers['sound'] > 0:
                     self.cpu.timers['sound'] -= 1
+                    self.audio.play()
+                else:
+                    self.audio.stop()
 
                 self.display.render()
 
@@ -150,5 +156,6 @@ class System:
             self.shutdown()
 
     def shutdown(self):
+        self.audio.shutdown()
         self.display.shutdown()
         sdl2.SDL_Quit()

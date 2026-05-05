@@ -1,8 +1,55 @@
 # pyChip8SDL
-Attempt at building a Chip8 emulator in Python3 using SDL2
 
-Project based on spec found at: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+A CHIP-8 emulator written in Python 3 using SDL2.
 
-## Dependancies
-SDL2 https://www.libsdl.org/download-2.0.php
+Project based on the spec at: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
+## Dependencies
+
+### System libraries (Homebrew)
+
+```sh
+brew install sdl2 sdl2_mixer
+```
+
+`sdl2` is the rendering/window/event backend; `sdl2_mixer` is used for the buzzer sound. The Python `pysdl2` package binds to whichever native libraries are installed on the system.
+
+### Python packages
+
+```sh
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Running
+
+```sh
+# Pick a ROM from a numbered list of bundled ROMs
+python -m chip8.app
+
+# Or pass a ROM path directly (relative to src/chip8/roms/, or absolute)
+python -m chip8.app "games/Pong [Paul Vervalin, 1990].ch8"
+python -m chip8.app /absolute/path/to/rom.ch8
+```
+
+107 ROMs ship under `src/chip8/roms/` (demos, programs, games).
+
+## Controls
+
+The CHIP-8 hex keypad is mapped onto the left side of a QWERTY keyboard:
+
+```
+CHIP-8 keypad        Keyboard
+1 2 3 C              1 2 3 4
+4 5 6 D       →      Q W E R
+7 8 9 E              A S D F
+A 0 B F              Z X C V
+```
+
+`Esc` quits the emulator.
+
+Different games use different keys — for example:
+- **Pong**: `1` / `Q` (left paddle up/down), `4` / `R` (right paddle up/down)
+- **Breakout**: `Q` / `E` (paddle left/right)
+- **Tetris**: `Q` / `W` / `E` (rotate / left / right), `A` (drop)
