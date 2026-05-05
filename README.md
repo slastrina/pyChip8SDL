@@ -2,6 +2,8 @@
 
 A CHIP-8 emulator written in Python 3 using SDL2.
 
+![Pong running in pyChip8SDL](docs/screenshots/emulator.png)
+
 Project based on the spec at: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
 ## Dependencies
@@ -42,6 +44,8 @@ python -m chip8.app /absolute/path/to/rom.ch8
 ## Debugger
 
 A second window opens alongside the emulator showing live state: V0–VF, I, PC, SP, the stack, the delay/sound timers, the keypad, a disassembly window centered on PC, and a hex dump of memory. Closing it leaves the emulator running.
+
+![Debugger window](docs/screenshots/debugger.png)
 
 | Key       | Action                                  |
 |-----------|-----------------------------------------|
