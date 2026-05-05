@@ -56,11 +56,12 @@ class Cpu:
 
         # Timer Registers: When these registers are non-zero, they are automatically decremented at a rate of 60Hz
         self.timers = {
-            'delay': [],
-            'sound': []
+            'delay': 0,
+            'sound': 0
         }
 
         self.key = bytearray(16)
+        self.waiting_for_key = None  # set to Vx index when Fx0A blocks
 
     def fetch(self):
         # Retrieve 2 bytes, the PC and PC+1
@@ -130,7 +131,7 @@ class Cpu:
         self.registers['pc'] = self.xnnn
 
     def skip_instruction_register_eq_value(self):
-        source = self.xnnn >> 8
+        source = self.xnxx >> 8
 
         if self.registers['v'][source] == self.xxnn:
             self.registers['pc'] += 2
@@ -225,10 +226,10 @@ class Cpu:
 
     def reg_shr(self):
         x = self.xnxx >> 8
-        y = self.xxnx >> 4
 
-        self.registers['v'][0xF] = self.registers['v'][x] & 0x1
-        self.registers['v'][y] = self.registers['v'][x] >> 1
+        carry = self.registers['v'][x] & 0x1
+        self.registers['v'][x] = self.registers['v'][x] >> 1
+        self.registers['v'][0xF] = carry
 
     def reg_subn(self):
         x = self.xnxx >> 8
@@ -243,10 +244,10 @@ class Cpu:
 
     def reg_shl(self):
         x = self.xnxx >> 8
-        y = self.xxnx >> 4
 
-        self.registers['v'][0xF] = (self.registers['v'][x] & 0x80) >> 1
-        self.registers['v'][y] = self.registers['v'][x] << 1
+        carry = (self.registers['v'][x] & 0x80) >> 7
+        self.registers['v'][x] = (self.registers['v'][x] << 1) & 0xFF
+        self.registers['v'][0xF] = carry
 
 
     def skip_instruction_register_neq_register(self):
@@ -259,7 +260,7 @@ class Cpu:
         self.registers['i'] = self.xnnn
 
     def jump_to_address_plus_value(self):
-        self.registers['pc'] = self.registers['i'] + self.xnnn
+        self.registers['pc'] = self.xnnn + self.registers['v'][0]
 
     def random_number_generator(self):
         value = self.xxnn
@@ -269,21 +270,72 @@ class Cpu:
     def draw_sprite(self):
         x_source = self.xnxx >> 8
         y_source = self.xxnx >> 4
-        x_pos = self.registers['v'][x_source]
-        y_pos = self.registers['v'][y_source]
+        x_pos = self.registers['v'][x_source] % self.display.width
+        y_pos = self.registers['v'][y_source] % self.display.height
         num_bytes = self.xxxn
         self.registers['v'][0xF] = 0
 
-        if self.mode == 'EXTENDED' and num_bytes == 0:
-            pass
-        else:
-            pass
+        for row in range(num_bytes):
+            sprite_byte = self.memory[self.registers['i'] + row]
+            py = (y_pos + row) % self.display.height
+            for bit in range(8):
+                if not (sprite_byte >> (7 - bit)) & 1:
+                    continue
+                px = (x_pos + bit) % self.display.width
+                if self.display.get_pixel(px, py):
+                    self.display.set_pixel(px, py, 0)
+                    self.registers['v'][0xF] = 1
+                else:
+                    self.display.set_pixel(px, py, 1)
 
     def keyboard_event(self):
-        pass
+        x = self.xnxx >> 8
+        key_index = self.registers['v'][x] & 0xF
+
+        if self.xxnn == 0x9E:
+            if self.key[key_index]:
+                self.registers['pc'] += 2
+        elif self.xxnn == 0xA1:
+            if not self.key[key_index]:
+                self.registers['pc'] += 2
+        else:
+            raise Exception(f"Unknown Opcode {self.opcode:04X}")
 
     def other_routines(self):
-        pass
+        x = self.xnxx >> 8
+        op = self.xxnn
+
+        if op == 0x07:
+            self.registers['v'][x] = self.timers['delay']
+        elif op == 0x0A:
+            for k in range(16):
+                if self.key[k]:
+                    self.registers['v'][x] = k
+                    return
+            # No key pressed — re-execute this instruction next tick
+            self.registers['pc'] -= 2
+        elif op == 0x15:
+            self.timers['delay'] = self.registers['v'][x]
+        elif op == 0x18:
+            self.timers['sound'] = self.registers['v'][x]
+        elif op == 0x1E:
+            self.registers['i'] = (self.registers['i'] + self.registers['v'][x]) & 0xFFF
+        elif op == 0x29:
+            # Font sprites are 5 bytes each, loaded at address 0
+            self.registers['i'] = (self.registers['v'][x] & 0xF) * 5
+        elif op == 0x33:
+            val = self.registers['v'][x]
+            self.memory[self.registers['i']] = val // 100
+            self.memory[self.registers['i'] + 1] = (val // 10) % 10
+            self.memory[self.registers['i'] + 2] = val % 10
+        elif op == 0x55:
+            for r in range(x + 1):
+                self.memory[self.registers['i'] + r] = self.registers['v'][r]
+        elif op == 0x65:
+            for r in range(x + 1):
+                self.registers['v'][r] = self.memory[self.registers['i'] + r]
+        else:
+            raise Exception(f"Unknown Opcode {self.opcode:04X}")
 
     operations = {
         0x0000: clear_return,
