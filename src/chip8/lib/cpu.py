@@ -89,10 +89,9 @@ class Cpu:
         if self.xxnx == 0x00C0:  # special case since 0x000F is variable it cant be matched directly
             self.screen_scroll_down()
 
-        try:
-            ops[self.xxnn]()
-        except Exception as ex:
-            raise Exception(f"Unknown Opcode {self.opcode}")
+        if self.xxnn not in ops:
+            raise Exception(f"Unknown Opcode {self.opcode:04X}")
+        ops[self.xxnn]()
 
     def clear_screen(self):  # 0x00E0
         self.display.reset()
@@ -170,10 +169,10 @@ class Cpu:
             0x800E: self.reg_shl,   # 8xyE SHL
         }
 
-        try:
-            ops[self.opcode & 0xF00F]()
-        except Exception as ex:
-            raise Exception(f"Unknown Opcode {self.opcode}")
+        key = self.opcode & 0xF00F
+        if key not in ops:
+            raise Exception(f"Unknown Opcode {self.opcode:04X}")
+        ops[key]()
 
     def reg_load(self):
         x = self.xnxx >> 8
@@ -218,7 +217,7 @@ class Cpu:
         y = self.xxnx >> 4
 
         if self.registers['v'][x] > self.registers['v'][y]:
-            self.registers['v'][x] = self.registers['v'][x] - self.registe13rs['v'][y]
+            self.registers['v'][x] = self.registers['v'][x] - self.registers['v'][y]
             self.registers['v'][0xF] = 1
         else:
             self.registers['v'][x] = 256 + self.registers['v'][x] - self.registers['v'][y]
@@ -359,7 +358,6 @@ class Cpu:
     def tick(self):
         self.fetch()
 
-        try:
-            self.operations[self.nxxx](self)
-        except Exception as ex:
-            raise Exception(f"Unknown Opcode {self.opcode}")
+        if self.nxxx not in self.operations:
+            raise Exception(f"Unknown Opcode {self.opcode:04X}")
+        self.operations[self.nxxx](self)
