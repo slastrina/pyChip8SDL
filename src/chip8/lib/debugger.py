@@ -92,7 +92,8 @@ def disassemble(opcode):
 
 class Debugger:
     WIDTH = 720
-    HEIGHT = 540
+    HEIGHT = 600
+    MEMORY_Y = 320
 
     def __init__(self):
         self.window = None
@@ -173,65 +174,69 @@ class Debugger:
 
         regs = cpu.registers
         timers = cpu.timers
+        stack = regs['stack']
         pc = regs['pc']
+        ram_size = len(ram._ram)
 
         # Status line
         status = "PAUSED" if paused else "RUNNING"
         status_color = YELLOW if paused else GREEN
         self._draw_text(f"[{status}]", 8, 8, status_color)
         self._draw_text(
-            "Space: pause/resume   F10: step   F2: reset   PgUp/PgDn: scroll mem   Home: follow PC   Esc: quit",
+            "Space pause   F10 step   F2 reset   PgUp/PgDn scroll   Home follow PC   Esc quit",
             80, 8, DIM,
         )
 
-        # Registers
-        col = 8
-        row = 36
-        self._draw_text("REGISTERS", col, row, ACCENT)
-        row += self.line_h
-        for r in range(0, 16, 2):
-            self._draw_text(
-                f"V{r:X}={regs['v'][r]:02X}   V{r+1:X}={regs['v'][r+1]:02X}",
-                col, row,
-            )
-            row += self.line_h
-        row += 6
-        self._draw_text(f"PC = {pc:03X}", col, row); row += self.line_h
-        self._draw_text(f"I  = {regs['i']:03X}", col, row); row += self.line_h
-        self._draw_text(f"SP = {len(regs['stack'])}", col, row); row += self.line_h
-        self._draw_text(f"DT = {timers['delay']:02X}", col, row); row += self.line_h
-        self._draw_text(f"ST = {timers['sound']:02X}", col, row); row += self.line_h
-        row += 6
-        self._draw_text("STACK", col, row, ACCENT); row += self.line_h
-        stack = regs['stack']
+        # Registers column (4 regs per row -> 4 rows)
+        reg_x = 8
+        y = 36
+        self._draw_text("REGISTERS", reg_x, y, ACCENT)
+        y += self.line_h
+        for base_r in (0, 4, 8, 12):
+            text = " ".join(f"V{base_r + i:X}={regs['v'][base_r + i]:02X}" for i in range(4))
+            self._draw_text(text, reg_x, y)
+            y += self.line_h
+        y += 6
+        self._draw_text(f"PC={pc:03X}  I={regs['i']:03X}", reg_x, y); y += self.line_h
+        self._draw_text(
+            f"DT={timers['delay']:02X}  ST={timers['sound']:02X}  SP={len(stack)}",
+            reg_x, y,
+        ); y += self.line_h
+        y += 6
+        self._draw_text("STACK", reg_x, y, ACCENT); y += self.line_h
+        stack_max_y = self.MEMORY_Y - 6
         if not stack:
-            self._draw_text("(empty)", col, row, DIM)
+            self._draw_text("  (empty)", reg_x, y, DIM)
         else:
             for depth, addr in enumerate(reversed(stack[-8:])):
-                self._draw_text(f"{depth}: {addr:03X}", col, row)
-                row += self.line_h
+                if y + self.line_h > stack_max_y:
+                    break
+                self._draw_text(f"  {depth}: {addr:03X}", reg_x, y)
+                y += self.line_h
 
-        # Disassembly
-        dis_x = 200
+        # Disassembly column
+        dis_x = 240
         dis_y = 36
         self._draw_text("DISASM", dis_x, dis_y, ACCENT)
-        ram_size = len(ram._ram)
-        for i in range(-4, 14):
+        rows_before = 3
+        rows_after = 10
+        for idx, i in enumerate(range(-rows_before, rows_after + 1)):
             addr = pc + i * 2
-            line_y = dis_y + self.line_h * (i + 5)
+            line_y = dis_y + self.line_h * (idx + 1)
+            if line_y + self.line_h > self.MEMORY_Y - 6:
+                break
             if addr < 0 or addr + 1 >= ram_size:
                 continue
             opcode = (ram[addr] << 8) | ram[addr + 1]
-            mnemonic = disassemble(opcode)
             color = YELLOW if i == 0 else (DIM if i < 0 else WHITE)
             marker = "->" if i == 0 else "  "
             self._draw_text(
-                f"{marker} {addr:03X}: {opcode:04X}  {mnemonic}",
+                f"{marker} {addr:03X}: {opcode:04X}  {disassemble(opcode)}",
                 dis_x, line_y, color,
             )
 
         # Keypad state
-        key_x = 460
+        key_x = 540
         key_y = 36
         self._draw_text("KEYS", key_x, key_y, ACCENT)
         keypad = [
@@ -249,15 +254,19 @@ class Debugger:
                 color,
             )
 
-        # Memory hex dump
+        # Memory hex dump (fixed Y so it never overlaps the panels above)
         if self.follow_pc:
             self.mem_offset = pc & ~0xF
         mem_x = 8
-        mem_y = 340
-        title = f"MEMORY @ {self.mem_offset:03X}" + ("   (following PC)" if self.follow_pc else "")
+        mem_y = self.MEMORY_Y
+        title = f"MEMORY @ {self.mem_offset:03X}"
+        if self.follow_pc:
+            title += "   (following PC)"
         self._draw_text(title, mem_x, mem_y, ACCENT)
         offset = self.mem_offset & ~0xF
-        rows = 12
+
+        available = self.HEIGHT - (mem_y + self.line_h) - 8
+        rows = max(1, available // self.line_h)
         for r in range(rows):
             base = offset + r * 16
             if base >= ram_size:
@@ -267,10 +276,7 @@ class Debugger:
                 chr(ram[base + c]) if 32 <= ram[base + c] < 127 else "."
                 for c in range(16) if base + c < ram_size
             )
-            color = WHITE
-            # Highlight the row containing PC
-            if base <= pc < base + 16:
-                color = YELLOW
+            color = YELLOW if base <= pc < base + 16 else WHITE
             self._draw_text(
                 f"{base:03X}: {hex_part}  {ascii_part}",
                 mem_x, mem_y + self.line_h * (r + 1),
