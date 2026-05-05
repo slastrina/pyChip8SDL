@@ -15,23 +15,25 @@ class Display:
         self.bg = bg
         self.window = None
         self.renderer = None
+        self.window_id = None
 
         self.reset()
 
-    def open(self):
+    def open(self, x=None, y=None):
         if self.window:
             return
 
         self.window = sdl2.SDL_CreateWindow(
             self.title.encode("utf-8"),
-            sdl2.SDL_WINDOWPOS_CENTERED,
-            sdl2.SDL_WINDOWPOS_CENTERED,
+            sdl2.SDL_WINDOWPOS_CENTERED if x is None else x,
+            sdl2.SDL_WINDOWPOS_CENTERED if y is None else y,
             self.width * self.scale,
             self.height * self.scale,
             sdl2.SDL_WINDOW_SHOWN,
         )
         if not self.window:
             raise RuntimeError(f"SDL window creation failed: {sdl2.SDL_GetError().decode()}")
+        self.window_id = sdl2.SDL_GetWindowID(self.window)
 
         self.renderer = sdl2.SDL_CreateRenderer(
             self.window, -1, sdl2.SDL_RENDERER_ACCELERATED

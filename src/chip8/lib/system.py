@@ -7,6 +7,7 @@ import sdl2
 from chip8 import rom_path
 from chip8.lib.audio import Audio
 from chip8.lib.cpu import Cpu
+from chip8.lib.debugger import Debugger
 from chip8.lib.display import Display
 from chip8.lib.ram import Ram
 
@@ -34,6 +35,9 @@ class System:
         self.display = Display(64, 32, scale=12, title="pyChip8SDL")
         self.audio = Audio()
         self.cpu = Cpu(self.ram.get_program_address(), self.ram, self.display)
+        self.debugger = Debugger()
+        self.paused = False
+        self.step_request = False
 
     def reset(self):
         self.ram.reset()
@@ -102,16 +106,52 @@ class System:
                     return roms[idx - 1][1]
             print("Invalid selection.")
 
+    def _handle_debug_key(self, sym):
+        if sym == sdl2.SDLK_SPACE:
+            self.paused = not self.paused
+            return True
+        if sym == sdl2.SDLK_F10:
+            self.paused = True
+            self.step_request = True
+            return True
+        if sym == sdl2.SDLK_F2:
+            self.cpu.reset()
+            self.display.reset()
+            return True
+        if self.debugger.enabled:
+            if sym == sdl2.SDLK_PAGEUP:
+                self.debugger.scroll(-0x80)
+                return True
+            if sym == sdl2.SDLK_PAGEDOWN:
+                self.debugger.scroll(0x80)
+                return True
+            if sym == sdl2.SDLK_HOME:
+                self.debugger.jump_to_pc()
+                return True
+        return False
+
     def _pump_events(self):
         event = sdl2.SDL_Event()
         while sdl2.SDL_PollEvent(ctypes.byref(event)):
             if event.type == sdl2.SDL_QUIT:
                 self.cpu.running = False
+            elif event.type == sdl2.SDL_WINDOWEVENT:
+                if event.window.event == sdl2.SDL_WINDOWEVENT_CLOSE:
+                    wid = event.window.windowID
+                    if self.debugger.enabled and wid == self.debugger.window_id:
+                        self.debugger.shutdown()
+                    else:
+                        self.cpu.running = False
             elif event.type == sdl2.SDL_KEYDOWN:
                 sym = event.key.keysym.sym
                 if sym == sdl2.SDLK_ESCAPE:
                     self.cpu.running = False
-                elif sym in KEY_MAP:
+                    continue
+                if self._handle_debug_key(sym):
+                    continue
+                # Game keys only when the emulator window has focus
+                wid = event.key.windowID
+                if wid == self.display.window_id and sym in KEY_MAP:
                     self.cpu.key[KEY_MAP[sym]] = 1
             elif event.type == sdl2.SDL_KEYUP:
                 sym = event.key.keysym.sym
@@ -121,8 +161,16 @@ class System:
     def start(self):
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError(f"SDL_Init failed: {sdl2.SDL_GetError().decode()}")
-        self.display.open()
+
+        # Lay the two windows out side by side so they don't overlap.
+        margin_x, margin_y = 40, 80
+        gap = 20
+        self.display.open(x=margin_x, y=margin_y)
         self.audio.open()
+        self.debugger.open(
+            x=margin_x + self.display.width * self.display.scale + gap,
+            y=margin_y,
+        )
 
         self.cpu.running = True
         next_frame = time.perf_counter()
@@ -131,20 +179,28 @@ class System:
             while self.cpu.running:
                 self._pump_events()
 
-                for _ in range(CYCLES_PER_FRAME):
-                    if not self.cpu.running:
-                        break
-                    self.cpu.tick()
-
-                if self.cpu.timers['delay'] > 0:
-                    self.cpu.timers['delay'] -= 1
-                if self.cpu.timers['sound'] > 0:
-                    self.cpu.timers['sound'] -= 1
-                    self.audio.play()
-                else:
+                if self.paused:
+                    if self.step_request:
+                        self.cpu.tick()
+                        self.step_request = False
                     self.audio.stop()
+                else:
+                    for _ in range(CYCLES_PER_FRAME):
+                        if not self.cpu.running:
+                            break
+                        self.cpu.tick()
+
+                    if self.cpu.timers['delay'] > 0:
+                        self.cpu.timers['delay'] -= 1
+                    if self.cpu.timers['sound'] > 0:
+                        self.cpu.timers['sound'] -= 1
+                        self.audio.play()
+                    else:
+                        self.audio.stop()
 
                 self.display.render()
+                if self.debugger.enabled:
+                    self.debugger.render(self.cpu, self.ram, self.paused)
 
                 next_frame += FRAME_TIME
                 now = time.perf_counter()
@@ -156,6 +212,7 @@ class System:
             self.shutdown()
 
     def shutdown(self):
+        self.debugger.shutdown()
         self.audio.shutdown()
         self.display.shutdown()
         sdl2.SDL_Quit()

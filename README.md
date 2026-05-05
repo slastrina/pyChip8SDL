@@ -9,10 +9,14 @@ Project based on the spec at: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 ### System libraries (Homebrew)
 
 ```sh
-brew install sdl2 sdl2_mixer
+brew install sdl2 sdl2_mixer sdl2_ttf
 ```
 
-`sdl2` is the rendering/window/event backend; `sdl2_mixer` is used for the buzzer sound. The Python `pysdl2` package binds to whichever native libraries are installed on the system.
+- `sdl2` — rendering / window / event backend
+- `sdl2_mixer` — buzzer sound
+- `sdl2_ttf` — text rendering for the debugger window
+
+The Python `pysdl2` package binds to whichever native libraries are installed on the system.
 
 ### Python packages
 
@@ -34,6 +38,21 @@ python -m chip8.app /absolute/path/to/rom.ch8
 ```
 
 107 ROMs ship under `src/chip8/roms/` (demos, programs, games).
+
+## Debugger
+
+A second window opens alongside the emulator showing live state: V0–VF, I, PC, SP, the stack, the delay/sound timers, the keypad, a disassembly window centered on PC, and a hex dump of memory. Closing it leaves the emulator running.
+
+| Key       | Action                                  |
+|-----------|-----------------------------------------|
+| `Space`   | Toggle pause/resume                     |
+| `F10`     | Single-step one CPU instruction (pauses) |
+| `F2`      | Reset the CPU and clear the screen      |
+| `PgUp`/`PgDn` | Scroll the memory hex dump          |
+| `Home`    | Snap the memory view back to following PC |
+| `Esc`     | Quit                                    |
+
+When paused, timers stop and the buzzer is silenced; resuming continues from the same state.
 
 ## Controls
 
